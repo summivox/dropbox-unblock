@@ -25,15 +25,13 @@ addHttp = (url) ->
 makeProxy = -> http.createServer()
   .on 'connection', (conn) ->
     ip = conn.remoteAddress
-    if !isLocal ip
-      console.log 'not local, banned'
-      conn.end()
-    else
-      console.log '### start'
+    if !isLocal ip then return conn.end()
+    console.log '### start'
   .on 'close', ->
     console.log '### stop'
 
   .on 'connect', (req, local, head) ->
+    # start request then pipe
     {hostname, port} = parse addHttp req.url
     console.log ">>> connect #{hostname}:#{port}"
     remote = net.connect port, hostname, ->
@@ -54,6 +52,7 @@ makeProxy = -> http.createServer()
       if BAN_LIST.every((ban) -> !(key.match ///#{ban}///i))
         headers[key] = value
 
+    # forward request
     me_to_r = http.request {
       hostname, port, method, path, headers
     }, (r_to_me) ->
@@ -61,7 +60,7 @@ makeProxy = -> http.createServer()
       me_to_l.writeHead? r_to_me.statusCode, r_to_me.headers
       r_to_me.pipe me_to_l
 
-    # post-filter headers
+    # post-filter headers (before piping -- headers not sent yet)
     me_to_r.removeHeader ban for ban in BAN_LIST
 
     l_to_me.pipe me_to_r
@@ -70,4 +69,4 @@ makeProxy = -> http.createServer()
 process.on 'uncaughtException', (err) -> console.error "ERR #{err}"
 if isNaN port = parseInt process.argv.pop() then port = PORT
 makeProxy().listen(port)
-console.log "=== dropbox-unblock running at 127.0.0.1:#{port} ==="
+console.log "=== dropbox-unblock running at 127.0.0.1:#{port}"
