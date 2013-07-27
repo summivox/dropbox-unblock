@@ -1,7 +1,7 @@
 var net = require('net');
-var local_port = 8765;
+var local_port = 8889;
 
-//ÔÚ±¾µØ´´½¨Ò»¸öserver¼àÌı±¾µØlocal_port¶Ë¿Ú
+//åœ¨æœ¬åœ°åˆ›å»ºä¸€ä¸ªserverç›‘å¬æœ¬åœ°local_portç«¯å£
 net.createServer(function (client)
 {
     
@@ -10,7 +10,7 @@ net.createServer(function (client)
         client.end();
     } else {
         
-        //Ê×ÏÈ¼àÌıä¯ÀÀÆ÷µÄÊı¾İ·¢ËÍÊÂ¼ş£¬Ö±µ½ÊÕµ½µÄÊı¾İ°üº¬ÍêÕûµÄhttpÇëÇóÍ·
+        //é¦–å…ˆç›‘å¬æµè§ˆå™¨çš„æ•°æ®å‘é€äº‹ä»¶ï¼Œç›´åˆ°æ”¶åˆ°çš„æ•°æ®åŒ…å«å®Œæ•´çš„httpè¯·æ±‚å¤´
         var buffer = new Buffer(0);
         var req = false;
         client.on('data',function(data)
@@ -24,37 +24,49 @@ net.createServer(function (client)
         });
     }
 
-    //´ÓhttpÇëÇóÍ·²¿È¡µÃÇëÇóĞÅÏ¢ºó£¬¼ÌĞø¼àÌıä¯ÀÀÆ÷·¢ËÍÊı¾İ£¬Í¬Ê±Á¬½ÓÄ¿±ê·şÎñÆ÷£¬²¢°ÑÄ¿±ê·şÎñÆ÷µÄÊı¾İ´«¸øä¯ÀÀÆ÷
+    //ä»httpè¯·æ±‚å¤´éƒ¨å–å¾—è¯·æ±‚ä¿¡æ¯åï¼Œç»§ç»­ç›‘å¬æµè§ˆå™¨å‘é€æ•°æ®ï¼ŒåŒæ—¶è¿æ¥ç›®æ ‡æœåŠ¡å™¨ï¼Œå¹¶æŠŠç›®æ ‡æœåŠ¡å™¨çš„æ•°æ®ä¼ ç»™æµè§ˆå™¨
     function relay_connection(req)
     {
         console.log(req.method+' '+req.host+':'+req.port);
 
-        //Èç¹ûÇëÇó²»ÊÇCONNECT·½·¨£¨GET, POST£©£¬ÄÇÃ´Ìæ»»µôÍ·²¿µÄÒ»Ğ©¶«Î÷
+        //å¦‚æœè¯·æ±‚ä¸æ˜¯CONNECTæ–¹æ³•ï¼ˆGET, POSTï¼‰ï¼Œé‚£ä¹ˆæ›¿æ¢æ‰å¤´éƒ¨çš„ä¸€äº›ä¸œè¥¿
         if (req.method != 'CONNECT')
         {
-            //ÏÈ´ÓbufferÖĞÈ¡³öÍ·²¿
+            //å…ˆä»bufferä¸­å–å‡ºå¤´éƒ¨
             var _body_pos = buffer_find_body(buffer);
             if (_body_pos < 0) _body_pos = buffer.length;
             var header = buffer.slice(0,_body_pos).toString('utf8');
-            //Ìæ»»connectionÍ·
+            //æ›¿æ¢connectionå¤´
+            console.log('> (header)');
+            console.log(header);
             header = header.replace(/(proxy\-)?connection\:.+\r\n/ig,'')
                     .replace(/Keep\-Alive\:.+\r\n/i,'')
                     .replace(/Host\: notify\d+\.dropbox\.com.*\r\n/i,'')
                     .replace("\r\n",'\r\nConnection: close\r\n');
-            //Ìæ»»ÍøÖ·¸ñÊ½(È¥µôÓòÃû²¿·Ö)
+            //æ›¿æ¢ç½‘å€æ ¼å¼(å»æ‰åŸŸåéƒ¨åˆ†)
             if (req.httpVersion == '1.1')
             {
                 var url = req.path.replace(/http\:\/\/[^\/]+/,'');
                 if (url.path != url) header = header.replace(req.path,url);
             }
             buffer = buffer_add(new Buffer(header,'utf8'),buffer.slice(_body_pos));
+            console.log('(header) >');
+            console.log(header);
         }
         
-        //½¨Á¢µ½Ä¿±ê·şÎñÆ÷µÄÁ¬½Ó
+        //å»ºç«‹åˆ°ç›®æ ‡æœåŠ¡å™¨çš„è¿æ¥
         var server = net.createConnection(req.port,req.host);
-        //½»»»·şÎñÆ÷Óëä¯ÀÀÆ÷µÄÊı¾İ
-        client.on("data", function(data){ server.write(data); });
-        server.on("data", function(data){ client.write(data); });
+        //äº¤æ¢æœåŠ¡å™¨ä¸æµè§ˆå™¨çš„æ•°æ®
+        client.on("data", function(data){
+          server.write(data);
+          console.log('\n>>>>>>');
+          console.log(data);
+        });
+        server.on("data", function(data){
+          client.write(data)
+          console.log('\n<<<<<<');
+          console.log(data);
+        });
 
         client.on('close',function(had_error) {
             console.log('Client closed connection to ' + req.host);
@@ -77,7 +89,7 @@ net.createServer(function (client)
 console.log('Proxy server running at localhost:'+local_port);
 
 
-//´¦Àí¸÷ÖÖ´íÎó
+//å¤„ç†å„ç§é”™è¯¯
 process.on('uncaughtException', function(err)
 {
     console.log("\nError!!!!");
@@ -87,9 +99,9 @@ process.on('uncaughtException', function(err)
 
 
 /**
-* ´ÓÇëÇóÍ·²¿È¡µÃÇëÇóÏêÏ¸ĞÅÏ¢
-* Èç¹ûÊÇ CONNECT ·½·¨£¬ÄÇÃ´»á·µ»Ø { method,host,port,httpVersion}
-* Èç¹ûÊÇ GET/POST ·½·¨£¬ÄÇÃ´·µ»Ø { metod,host,port,path,httpVersion}
+* ä»è¯·æ±‚å¤´éƒ¨å–å¾—è¯·æ±‚è¯¦ç»†ä¿¡æ¯
+* å¦‚æœæ˜¯ CONNECT æ–¹æ³•ï¼Œé‚£ä¹ˆä¼šè¿”å› { method,host,port,httpVersion}
+* å¦‚æœæ˜¯ GET/POST æ–¹æ³•ï¼Œé‚£ä¹ˆè¿”å› { metod,host,port,path,httpVersion}
 */
 function parse_request(buffer)
 {
@@ -121,7 +133,7 @@ function parse_request(buffer)
 
 
 /**
-* Á½¸öbuffer¶ÔÏó¼ÓÆğÀ´
+* ä¸¤ä¸ªbufferå¯¹è±¡åŠ èµ·æ¥
 */
 function buffer_add(buf1,buf2)
 {
@@ -132,7 +144,7 @@ function buffer_add(buf1,buf2)
 }
 
 /**
-* ´Ó»º´æÖĞÕÒµ½Í·²¿½áÊø±ê¼Ç("\r\n\r\n")µÄÎ»ÖÃ
+* ä»ç¼“å­˜ä¸­æ‰¾åˆ°å¤´éƒ¨ç»“æŸæ ‡è®°("\r\n\r\n")çš„ä½ç½®
 */
 function buffer_find_body(b)
 {
