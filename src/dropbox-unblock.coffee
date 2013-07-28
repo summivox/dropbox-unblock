@@ -5,7 +5,7 @@ http = require 'http'
 # default port of proxy
 PORT = 8888
 
-# header entries to strip from HTTP {GET, POST}
+# headers to be stripped (lower-case)
 BAN_LIST = [
   'connection'
   'keep-alive'
@@ -49,7 +49,7 @@ makeProxy = -> http.createServer()
     # pre-filter headers
     headers = {'connection': 'close'}
     for key, value of l_to_me.headers
-      if BAN_LIST.every((ban) -> !(key.match ///#{ban}///i))
+      if key.toLowerCase() not in BAN_LIST
         headers[key] = value
 
     # forward request
@@ -57,7 +57,7 @@ makeProxy = -> http.createServer()
       hostname, port, method, path, headers
     }, (r_to_me) ->
       console.log "<<< #{method} #{r_to_me.statusCode}"
-      me_to_l.writeHead? r_to_me.statusCode, r_to_me.headers
+      me_to_l.writeHead r_to_me.statusCode, r_to_me.headers
       r_to_me.pipe me_to_l
 
     # post-filter headers (before piping -- headers not sent yet)
