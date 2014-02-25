@@ -22,48 +22,49 @@ isLocal = (ip) ->
 addHttp = (url) ->
   if url.match /^http:\/\// then url else 'http:\/\/' + url
 
-makeProxy = -> http.createServer()
-  .on 'connection', (conn) ->
-    ip = conn.remoteAddress
-    if !isLocal ip then return conn.end()
-    console.log '### start'
-  .on 'close', ->
-    console.log '### stop'
+makeProxy = ->
+  http.createServer()
+    .on 'connection', (conn) ->
+      ip = conn.remoteAddress
+      if !isLocal ip then return conn.end()
+      console.log '### start'
+    .on 'close', ->
+      console.log '### stop'
 
-  .on 'connect', (req, local, head) ->
-    # start request then pipe
-    {hostname, port} = parse addHttp req.url
-    console.log ">>> connect #{hostname}:#{port}"
-    remote = net.connect port, hostname, ->
-      console.log "<<< connect"
-      local.write CONN_RESPONSE
-      remote.write head
-      local.pipe remote
-      remote.pipe local
+    .on 'connect', (req, local, head) ->
+      # start request then pipe
+      {hostname, port} = parse addHttp req.url
+      console.log ">>> connect #{hostname}:#{port}"
+      remote = net.connect port, hostname, ->
+        console.log "<<< connect"
+        local.write CONN_RESPONSE
+        remote.write head
+        local.pipe remote
+        remote.pipe local
 
-  .on 'request', (l_to_me, me_to_l) ->
-    {method, url} = l_to_me
-    {hostname, port, path} = urlp = parse url
-    console.log ">>> #{method} #{hostname}:#{port}#{path}"
+    .on 'request', (l_to_me, me_to_l) ->
+      {method, url} = l_to_me
+      {hostname, port, path} = urlp = parse url
+      console.log ">>> #{method} #{hostname}:#{port}#{path}"
 
-    # pre-filter headers
-    headers = {'connection': 'close'}
-    for key, value of l_to_me.headers
-      if key.toLowerCase() not in BAN_LIST
-        headers[key] = value
+      # pre-filter headers
+      headers = {'connection': 'close'}
+      for key, value of l_to_me.headers
+        if key.toLowerCase() not in BAN_LIST
+          headers[key] = value
 
-    # forward request
-    me_to_r = http.request {
-      hostname, port, method, path, headers
-    }, (r_to_me) ->
-      console.log "<<< #{method} #{r_to_me.statusCode}"
-      me_to_l.writeHead r_to_me.statusCode, r_to_me.headers
-      r_to_me.pipe me_to_l
+      # forward request
+      me_to_r = http.request {
+        hostname, port, method, path, headers
+      }, (r_to_me) ->
+        console.log "<<< #{method} #{r_to_me.statusCode}"
+        me_to_l.writeHead r_to_me.statusCode, r_to_me.headers
+        r_to_me.pipe me_to_l
 
-    # post-filter headers (before piping -- headers not sent yet)
-    me_to_r.removeHeader ban for ban in BAN_LIST
+      # post-filter headers (before piping -- headers not sent yet)
+      me_to_r.removeHeader ban for ban in BAN_LIST
 
-    l_to_me.pipe me_to_r
+      l_to_me.pipe me_to_r
 
 # bootstrap
 process.on 'uncaughtException', (err) -> console.error "ERR #{err}"
